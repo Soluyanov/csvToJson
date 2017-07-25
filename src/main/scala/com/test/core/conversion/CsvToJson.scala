@@ -3,28 +3,34 @@ package com.test.core.conversion
 import org.json4s.jackson.JsonMethods._
 import org.json4s.JsonDSL._
 import java.io.PrintWriter
-import scala.io.Source
 import scala.collection.mutable.ArrayBuffer
+import org.apache.poi.ss.usermodel.WorkbookFactory
+import java.io.File
 
 object CsvToJson {
 
   def main(args: Array[String]) {
+
     case class Rectangle(x1: Int, x2: Int, y1: Int, y2: Int)
     case class Photo(path: String, rectangles: ArrayBuffer[Rectangle])
-    val rectangles1 = new ArrayBuffer[Rectangle]()
-    val file = Source.fromFile("/home/alexander/Desktop/SimpleReport.csv").getLines
+    val rectangles = new ArrayBuffer[Rectangle]()
+    import scala.collection.JavaConversions._
+    val workbook =
+      WorkbookFactory.create(new File("/home/alexander/Desktop/unionex.xlsx"))
     var fileName = "nothing"
     val out = new PrintWriter("/home/alexander/Desktop/output.json")
     out.println("[")
-    for (line <- file) {
 
-      val cells = line.split(";")
-      if (cells.length == 1 & rectangles1.isEmpty) {
-        fileName = cells(0)
-      }
-      if (cells.length == 1 & rectangles1.nonEmpty) {
+    for {
+      sheet <- workbook
+      row <- sheet
+    } {
+      if (row.getPhysicalNumberOfCells == 1 & rectangles.isEmpty)
+        fileName = row.getCell(0).toString
 
-       val photo = Photo(fileName, rectangles1)
+      if (row.getPhysicalNumberOfCells == 1 & rectangles.nonEmpty) {
+
+        val photo = Photo(fileName, rectangles)
 
         val obj =
           ("image_path" -> photo.path) ~
@@ -36,23 +42,23 @@ object CsvToJson {
                   ("y2" -> w.y2)
               })
         out.println(pretty(render(obj)) + ",")
-        fileName = cells(0)
-        rectangles1.clear()
+        fileName = row.getCell(0).toString
+        rectangles.clear()
 
       }
 
-      if (cells.length>1) {
-        if (!cells(0).isEmpty) {
-          rectangles1 += Rectangle(cells(7).toInt: Int,
-            cells(9).toInt: Int,
-            cells(8).toInt: Int,
-            cells(10).toInt: Int)
+      if (row.getPhysicalNumberOfCells == 9) {
 
-        }
+        rectangles += Rectangle(
+          row.getCell(7).getNumericCellValue.toInt: Int,
+          row.getCell(9).getNumericCellValue.toInt: Int,
+          row.getCell(8).getNumericCellValue.toInt: Int,
+          row.getCell(10).getNumericCellValue.toInt: Int
+        )
+
       }
     }
 
-out.println("]")
-    out.close()
-     }
+  }
+
 }
